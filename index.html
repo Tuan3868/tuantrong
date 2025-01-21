@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pháo hoa năm mới</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: black;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    canvas {
+      display: block;
+    }
+    button, input {
+      position: absolute;
+      top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: red;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 10;
+    }
+    button:hover {
+      background-color: darkred;
+    }
+    #uploadButton {
+      left: 20px;
+      background-color: blue;
+    }
+    #uploadButton:hover {
+      background-color: darkblue;
+    }
+    #playButton {
+      right: 20px;
+    }
+  </style>
+</head>
+<body>
+  <input type="file" id="uploadButton" accept="image/*">
+  <button id="playButton">Phát nhạc</button>
+  <canvas id="fireworksCanvas"></canvas>
+
+  <script>
+    const audio = new Audio("nhac1.wav");
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    let audioSource;
+
+    let scale = 1;
+
+    function enableMusic() {
+      audioContext.resume().then(() => {
+        audio.play();
+        audioSource = audioContext.createMediaElementSource(audio);
+        audioSource.connect(analyser);
+        analyser.connect(audioContext.destination);
+      });
+    }
+
+    document.getElementById("playButton").addEventListener("click", () => {
+      enableMusic();
+      document.getElementById("playButton").style.display = "none";
+    });
+
+    const canvas = document.getElementById("fireworksCanvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const fireworks = [];
+    const particlesPerFirework = 150;
+
+    class Particle {
+      constructor(x, y, color, size, velocityMultiplier = 1, angle = 0, isSpiral = false) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.cos(angle) * velocityMultiplier) + (Math.random() * 2 - 1) * velocityMultiplier;
+        this.vy = (Math.sin(angle) * velocityMultiplier) + (Math.random() * 2 - 1) * velocityMultiplier;
+        this.life = Math.random() * 100 + 50;
+        this.color = color;
+        this.size = size;
+        this.alpha = 1.0;
+        this.isSpiral = isSpiral;
+        this.angle = angle;
+        this.radius = Math.random() * 50;
+      }
+      update() {
+        if (this.isSpiral) {
+          this.angle += 0.1; // Hiệu ứng xoắn ốc
+          this.x += Math.cos(this.angle) * this.radius;
+          this.y += Math.sin(this.angle) * this.radius;
+        } else {
+          this.x += this.vx;
+          this.y += this.vy;
+          this.vy += 0.02;
+        }
+        this.alpha -= 0.02;
+        this.life--;
+      }
+      draw() {
+        ctx.globalAlpha = this.alpha;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    class Firework {
+      constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.particles = [];
+        this.type = type;
+        const colors = ["#ff0043", "#ff9900", "#ffff00", "#00ff00", "#0099ff", "#9900ff"];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+
+        for (let i = 0; i < particlesPerFirework; i++) {
+          const angle = (Math.PI * 2) / particlesPerFirework * i;
+          this.particles.push(new Particle(x, y, color, Math.random() * 3 + 1, 3, angle));
+        }
+      }
+      update() {
+        this.particles.forEach((particle) => particle.update());
+        this.particles = this.particles.filter((particle) => particle.life > 0);
+      }
+      draw() {
+        this.particles.forEach((particle) => particle.draw());
+      }
+    }
+
+    function addFirework() {
+      const x = Math.random() * canvas.width;
+      const y = Math.random() * canvas.height / 2;
+      fireworks.push(new Firework(x, y, "default"));
+    }
+
+    let image = new Image();
+    image.src = "anh2.png"; // Ảnh mặc định
+
+    // Sử dụng ảnh người dùng tải lên
+    document.getElementById("uploadButton").addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          image = new Image();
+          image.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    function drawTextAndImage() {
+      ctx.save();
+      ctx.font = `${48 * scale}px 'Brush Script MT', cursive`;
+      ctx.fillStyle = "white";
+      ctx.textAlign = "center";
+      ctx.fillText("HAPPY NEW YEAR 2025", canvas.width / 2, 80);
+      ctx.restore();
+
+      if (image.complete) {
+        const imgWidth = image.width / 2 * scale;
+        const imgHeight = image.height / 2 * scale;
+        ctx.drawImage(image, canvas.width / 2 - imgWidth / 2, canvas.height / 2 - imgHeight / 2, imgWidth, imgHeight);
+      }
+    }
+
+    function animate() {
+      ctx.globalAlpha = 0.1;
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      fireworks.forEach((firework, index) => {
+        firework.update();
+        firework.draw();
+        if (firework.particles.length === 0) {
+          fireworks.splice(index, 1);
+        }
+      });
+
+      if (audioSource) {
+        analyser.getByteFrequencyData(dataArray);
+        const avgFrequency = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+        scale = 1 + avgFrequency / 256;
+      }
+
+      drawTextAndImage();
+      requestAnimationFrame(animate);
+    }
+
+    setInterval(addFirework, 300);
+    animate();
+
+    window.addEventListener("resize", () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    });
+  </script>
+</body>
+</html>
